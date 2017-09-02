@@ -1,0 +1,213 @@
+buildscript {
+
+    repositories {
+        mavenCentral()
+        mavenLocal()
+        jcenter()
+    }
+
+    dependencies {
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+        classpath "se.transmode.gradle:gradle-docker:${dockerPluginVersion}"
+        classpath "net.ltgt.gradle:gradle-apt-plugin:${aptPluginVersion}"
+        classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:${nexusStagingPluginVersion}"
+    }
+
+}
+
+plugins {
+    id "io.spring.dependency-management" version "1.0.2.RELEASE"
+}
+
+apply from: "$rootDir/gradle/dependencies.gradle"
+apply plugin: 'io.codearte.nexus-staging'
+
+allprojects {
+    apply plugin: "idea"
+    apply plugin: 'jacoco'
+
+    repositories {
+        mavenCentral()
+        mavenLocal()
+        jcenter()
+        mavenRepoUrl.split(",").each { repoUrl -> maven { url repoUrl } }
+    }
+}
+
+subprojects {
+    apply plugin: "java"
+    apply plugin: "maven"
+    apply plugin: "io.spring.dependency-management"
+    apply plugin: "docker"
+    apply plugin: "maven-publish"
+    apply plugin: "net.ltgt.apt"
+    apply plugin: 'findbugs'
+    apply plugin: 'project-report'
+    apply plugin: 'signing'
+
+    sourceCompatibility = 1.8
+
+    compileJava {
+        options.encoding = "UTF-8"
+    }
+
+    sourceSets {
+        test {
+            java.srcDirs = ["src/test/java", "src/test/groovy"]
+        }
+    }
+
+    dependencies {
+        compile([
+                "$appLibs.lombok",
+                "$appLibs.commonLang3",
+                "$appLibs.groovyAll",
+                "$appLibs.guava",
+                "$appLibs.immutableValue",
+                "$appLibs.jackson",
+                "$appLibs.slf4j",
+                "$appLibs.h2"
+        ])
+
+        apt([
+                "$appLibs.immutableValue",
+                "$appLibs.lombok"
+        ])
+
+        testCompile([
+                "$appLibs.junit",
+                "$appLibs.assertj",
+                "$appLibs.spockCore",
+                "$appLibs.mutabilitydetector"
+        ])
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-starter-parent:${springBootVersion}"
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        }
+    }
+
+    task buildDocker(type: Docker, dependsOn: build) {
+        push = false
+        applicationName = jar.baseName
+        dockerfile = file("src/main/docker/Dockerfile")
+        doFirst {
+            copy {
+                from jar
+                into stageDir
+            }
+        }
+    }
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) { from components.java }
+        }
+    }
+
+    jar {
+        into("META-INF/maven/$project.group/$project.name") {
+            from { generatePomFileForMavenJavaPublication }
+            rename ".*", "pom.xml"
+        }
+    }
+
+    task processImmutableValue() {
+
+    }
+
+    compileJava.dependsOn(processImmutableValue)
+
+    task javadocJar(type: Jar) {
+        classifier = 'javadoc'
+        from javadoc
+    }
+
+    task sourcesJar(type: Jar) {
+        classifier = 'sources'
+        from sourceSets.main.allSource
+        doLast {
+            copy {
+                from "${rootDir}/secring.gpg"
+                into "${project.buildDir}"
+            }
+        }
+    }
+
+    artifacts {
+        archives javadocJar, sourcesJar
+    }
+
+    signing {
+        sign configurations.archives
+    }
+
+    uploadArchives {
+        repositories {
+            mavenDeployer {
+                beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+                repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                    authentication(userName: "${ossrhUsername}", password: "${ossrhPassword}")
+                }
+
+                snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                    authentication(userName: "${ossrhUsername}", password: "${ossrhPassword}")
+                }
+
+                pom.project {
+                    url 'https://big-data-nutshell.github.io'
+                    scm {
+                        connection 'git@github.com:devbhuwan/big-data-nutshell.git'
+                        developerConnection 'git@github.com:devbhuwan/big-data-nutshell.git'
+                        url 'https://github.com/devbhuwan/big-data-nutshell.git'
+                    }
+
+                    licenses {
+                        license {
+                            name 'The Apache License, Version 2.0'
+                            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+
+                    developers {
+                        developer {
+                            id 'developerbhuwan'
+                            name 'Bhuwan Prasad Upadhyay'
+                            email 'bhuwan.upadhyay49@gmail.com'
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
+
+task codeCoverageReport(type: JacocoReport) {
+    executionData fileTree(project.rootDir.absolutePath).include("**/build/jacoco/*.exec")
+
+    subprojects.each {
+        sourceSets it.sourceSets.main
+    }
+
+    reports {
+        xml.enabled true
+        xml.destination "${buildDir}/reports/jacoco/report.xml"
+        html.enabled false
+        csv.enabled false
+    }
+}
+
+codeCoverageReport.dependsOn {
+    subprojects*.test
+}
+
+nexusStaging {
+    username = "${nexusUsername}"
+    password = "${nexusPassword}"
+    packageGroup = "${group}"
+}
+
