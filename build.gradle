@@ -39,22 +39,11 @@ subprojects {
 
     dependencies {
         compile([
-                libs.commonsIO,
-                libs.commonsLang,
-                libs.guava,
-                libs.slf4jLog4j,
-                libs.log4j,
-                libs.scalaWebSockets,
-                libs.kafkaTest,
-                libs.curatorTest
+                libs.sparkMlLib
         ])
 
         compileOnly([
-                libs.spark,
-                libs.sparkMlLib,
-                libs.sparkGraphX,
-                libs.sparkStreaming,
-                libs.sparkStreamingKafka
+
         ])
 
 //        apt([
