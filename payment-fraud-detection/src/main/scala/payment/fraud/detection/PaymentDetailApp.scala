@@ -14,9 +14,8 @@ object PaymentDetailApp {
 
     // we take the raw data in CSV format and convert it into a set of records of the form (user, product, price)
     val data = sc.textFile("payment-fraud-detection/data/payment.csv")
-      .map(_.replaceAll("\"", ""))
       .map(line => line.split(","))
-      .map(paymentRecord => (paymentRecord(0), paymentRecord(1), paymentRecord(2),  paymentRecord(3), paymentRecord(4), paymentRecord(5)))
+      .map(paymentRecord => (paymentRecord(0), paymentRecord(1), paymentRecord(2), paymentRecord(3), paymentRecord(4), paymentRecord(5)))
 
     // let's count the number of purchases
     val numPayments = data.count()

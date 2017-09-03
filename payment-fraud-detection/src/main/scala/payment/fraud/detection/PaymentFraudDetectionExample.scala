@@ -6,9 +6,8 @@ import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
 import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler}
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.mllib.evaluation.BinaryClassificationMetrics
-import org.apache.spark.sql.types.DataTypes._
-import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.sql.{Dataset, SparkSession}
+import payment.fraud.detection.Common.{Payment, paymentSchema}
 
 /**
   * @author Bhuwan Prasad Upadhyay
@@ -16,14 +15,6 @@ import org.apache.spark.sql.{Dataset, SparkSession}
   */
 object PaymentFraudDetectionExample {
 
-  val schema = StructType(Array(
-    StructField("id", StringType, nullable = true),
-    StructField("customerName", StringType, nullable = true),
-    StructField("cardNo", StringType, nullable = true),
-    StructField("location", StringType, nullable = true),
-    StructField("amount", StringType, nullable = true),
-    StructField("time", StringType, nullable = true)
-  ))
 
   def main(args: Array[String]): Unit = {
     val paymentFraudDetection = "PaymentFraudDetection"
@@ -33,23 +24,24 @@ object PaymentFraudDetectionExample {
 
     import spark.implicits._
     val train: Dataset[Payment] = spark.read.option("paymentSchema", "false")
-      .schema(schema).csv("payment-fraud-detection/data/payment.csv").as[Payment]
+      .schema(paymentSchema).csv("payment-fraud-detection/data/payment.csv").as[Payment]
     train.take(1)
     train.cache
     println(train.count)
 
     val test: Dataset[Payment] = spark.read.option("paymentSchema", "false")
-      .schema(schema).csv("payment-fraud-detection/data/payment-test.csv").as[Payment]
+      .schema(paymentSchema).csv("payment-fraud-detection/data/payment-test.csv").as[Payment]
     test.take(2)
     println(test.count)
     test.cache
 
     train.printSchema()
     train.show
-    train.createOrReplaceTempView("account")
-    spark.catalog.cacheTable("account")
+    train.createOrReplaceTempView("payment")
+    spark.catalog.cacheTable("payment")
 
     train.groupBy("location").count.show
+
     val fractions = Map("False" -> .17, "True" -> 1.0)
     //Here we're keeping all instances of the Churn=True class, but downsampling the Churn=False class to a fraction of 388/2278.
     val strain = train.stat.sampleBy("location", fractions, 36L)
@@ -116,14 +108,9 @@ object PaymentFraudDetectionExample {
 
     val result = predictions.select("label", "prediction", "probability")
     result.show
-
-
-
-
     train.printSchema()
     train.show
   }
 
-  case class Payment(id: String, customerName: String, cardNo: String, location: String, amount: String, time: String)
 
 }

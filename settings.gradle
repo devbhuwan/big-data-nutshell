@@ -1,3 +1,4 @@
 rootProject.name = 'big-data-nutshell'
 include 'payment-fraud-detection'
+include 'payment-service'
 

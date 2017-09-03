@@ -1,0 +1,7 @@
+apply plugin: "scala"
+
+dependencies {
+    compile([
+            libs.sparkMlLib
+    ])
+}
