@@ -19,3 +19,4 @@ hs_err_pid*
 **/.idea/
 !/gradle/wrapper/gradle-wrapper.jar
 /spark-warehouse/
+/payment-fraud-detection/data/payment.csv
